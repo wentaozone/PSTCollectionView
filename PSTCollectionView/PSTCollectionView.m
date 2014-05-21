@@ -271,8 +271,10 @@ static void PSTCollectionViewCommonSetup(PSTCollectionView *_self) {
 
 - (void)setFrame:(CGRect)frame {
     if (!CGRectEqualToRect(frame, self.frame)) {
+        CGRect bounds = (CGRect){.origin=self.contentOffset, .size=frame.size};
+        BOOL shouldInvalidate = [self.collectionViewLayout shouldInvalidateLayoutForBoundsChange:bounds];
         [super setFrame:frame];
-        if ([self.collectionViewLayout shouldInvalidateLayoutForBoundsChange:self.bounds]) {
+        if (shouldInvalidate) {
             [self invalidateLayout];
             _collectionViewFlags.fadeCellsForBoundsChange = YES;
         }
@@ -281,8 +283,9 @@ static void PSTCollectionViewCommonSetup(PSTCollectionView *_self) {
 
 - (void)setBounds:(CGRect)bounds {
     if (!CGRectEqualToRect(bounds, self.bounds)) {
+        BOOL shouldInvalidate = [self.collectionViewLayout shouldInvalidateLayoutForBoundsChange:bounds];
         [super setBounds:bounds];
-        if ([self.collectionViewLayout shouldInvalidateLayoutForBoundsChange:bounds]) {
+        if (shouldInvalidate) {
             [self invalidateLayout];
             _collectionViewFlags.fadeCellsForBoundsChange = YES;
         }
@@ -610,18 +613,8 @@ static void PSTCollectionViewCommonSetup(PSTCollectionView *_self) {
 }
 
 - (NSIndexPath *)indexPathForItemAtPoint:(CGPoint)point {
-    __block NSIndexPath *indexPath = nil;
-    [_allVisibleViewsDict enumerateKeysAndObjectsWithOptions:kNilOptions usingBlock:^(id key, id obj, BOOL *stop) {
-        PSTCollectionViewItemKey *itemKey = (PSTCollectionViewItemKey *)key;
-        if (itemKey.type == PSTCollectionViewItemTypeCell) {
-            PSTCollectionViewCell *cell = (PSTCollectionViewCell *)obj;
-            if (CGRectContainsPoint(cell.frame, point) && cell.userInteractionEnabled) {
-                indexPath = itemKey.indexPath;
-                *stop = YES;
-            }
-        }
-    }];
-    return indexPath;
+    PSTCollectionViewLayoutAttributes *attributes = [[self.collectionViewLayout layoutAttributesForElementsInRect:CGRectMake(point.x, point.y, 1, 1)] lastObject];
+    return attributes.indexPath;
 }
 
 - (NSIndexPath *)indexPathForCell:(PSTCollectionViewCell *)cell {
@@ -1085,6 +1078,9 @@ static void PSTCollectionViewCommonSetup(PSTCollectionView *_self) {
     }
     else {
         layout.collectionView = self;
+        
+        _layout.collectionView = nil;
+        _layout = layout;
 
         _collectionViewData = [[PSTCollectionViewData alloc] initWithCollectionView:self layout:layout];
         [_collectionViewData prepareToLoadData];
@@ -1285,9 +1281,6 @@ static void PSTCollectionViewCommonSetup(PSTCollectionView *_self) {
             applyNewLayoutBlock();
             freeUnusedViews();
         }
-
-        _layout.collectionView = nil;
-        _layout = layout;
     }
 }
 
